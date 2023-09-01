@@ -1,0 +1,130 @@
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::BufReader;
+
+// mod tree;
+
+#[derive(Debug, PartialEq)]
+enum Token {
+    EOF,
+    Text(String),
+    NewLine,
+    Hash,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum HtmlTag {
+    P,
+    H1,
+    H2,
+    H3,
+    H4,
+    H5,
+    H6,
+}
+
+#[derive(Debug, Clone)]
+struct HtmlNode {
+    tag: Option<HtmlTag>,
+    children: Vec<(String, Option<HtmlNode>)>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct MarkdownTest {
+    markdown: String,
+    html: String,
+}
+
+fn tag_start_string(tag: &HtmlTag) -> String {
+    match tag {
+        HtmlTag::P => String::from("<p>"),
+        HtmlTag::H1 => String::from("<h1>"),
+        HtmlTag::H2 => String::from("<h2>"),
+        HtmlTag::H3 => String::from("<h3>"),
+        HtmlTag::H4 => String::from("<h4>"),
+        HtmlTag::H5 => String::from("<h5>"),
+        HtmlTag::H6 => String::from("<h6>"),
+    }
+}
+
+fn tag_end_string(tag: &HtmlTag) -> String {
+    match tag {
+        HtmlTag::P => String::from("</p>"),
+        HtmlTag::H1 => String::from("</h1>"),
+        HtmlTag::H2 => String::from("</h2>"),
+        HtmlTag::H3 => String::from("</h3>"),
+        HtmlTag::H4 => String::from("</h4>"),
+        HtmlTag::H5 => String::from("</h5>"),
+        HtmlTag::H6 => String::from("</h6>"),
+    }
+}
+
+fn tokenize(input: &str) -> Vec<Token> {
+    let mut tokens = Vec::new();
+    let mut input_chars = input.chars().peekable();
+
+    while let Some(c) = input_chars.next() {
+        match c {
+            '\n' => tokens.push(Token::NewLine),
+            '#' => tokens.push(Token::Hash),
+            default => {
+                let mut dst = [0; 4];
+                tokens.push(Token::Text(default.encode_utf8(&mut dst).to_string()));
+            }
+        }
+    }
+
+    tokens.push(Token::EOF);
+    return tokens;
+}
+
+fn nodes(tokens: Vec<Token>) -> Vec<HtmlNode> {
+    let mut token_iter = tokens.iter().peekable();
+    let mut html_nodes: Vec<HtmlNode> = vec![];
+    let mut curr_node: Option<&HtmlNode> = None;
+
+    while let Some(token) = token_iter.next() {
+        match token {
+            Token::Text(c) => match curr_node {
+                Some(node) => {}
+                None => {
+                    let node = HtmlNode {
+                        tag: Some(HtmlTag::P),
+                        children: vec![(c.to_string(), None)],
+                    };
+                    // curr_nodes.push(&node);
+                    html_nodes.push(node);
+                }
+            },
+            _ => {}
+        }
+    }
+
+    return html_nodes;
+}
+
+fn parse_commonmark(cm: &str) -> String {
+    let mut html: String = String::from("");
+    let tokens = tokenize(cm);
+    // let html_nodes = nodes(tokens);
+    // println!("{:?}", html_nodes);
+
+    return html;
+}
+
+fn main() {
+    let file = File::open("./tests.json").expect("Failed to open file");
+    let reader = BufReader::new(file);
+    let tests: Vec<MarkdownTest> = serde_json::from_reader(reader).expect("Failed to parse JSON");
+
+    for test in tests {
+        let parsed = parse_commonmark(test.markdown.as_str());
+
+        println!("Input:         {:?}", test.markdown);
+        println!("Parsed result: {:?}", parsed);
+        println!("Testbench:     {:?}", test.html);
+        println!("Match:         {}\n\n", parsed == test.html);
+    }
+
+    // tree::tree();
+}
